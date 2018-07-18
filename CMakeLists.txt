@@ -1,4 +1,3 @@
-
 #
 cmake_minimum_required ( VERSION 3.7 )  # for GREATER_EQUAL
 cmake_policy( SET CMP0020 NEW )
@@ -6,6 +5,15 @@ cmake_policy( SET CMP0042 NEW )
 cmake_policy( SET CMP0053 NEW )
 
 project ( socfpga_kernel )
+
+set ( REMOTE_HOST "de0" CACHE STRING "Target host address for install-remote" )
+set ( REMOTE_USER "" CACHE STRING "Target host login name for install-remote" )
+
+if ( REMOTE_USER )
+  set ( REMOTE_ACCOUNT ${REMOTE_USER}@${REMOTE_HOST} )
+else()
+  set ( REMOTE_ACCOUNT ${REMOTE_HOST} )
+endif()
 
 set ( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
@@ -57,6 +65,20 @@ add_custom_command(
 
 add_custom_target(
   zImage ALL DEPENDS ${CMAKE_BINARY_DIR}/linux-${KERNELRELEASE}/arch/arm/boot/zImage
+  )
+
+add_custom_target(
+  menuconfig
+  COMMAND ${MAKE} -C ${KERNEL_SOURCE} ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- menuconfig
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/linux-${KERNELRELEASE}
+  )
+
+add_custom_target( install-remote DEPENDS ${CMAKE_BINARY_DIR}/linux-${KERNELRELEASE}/arch/arm/boot/zImage
+  COMMAND cmake -E echo scp -p ${CMAKE_BINARY_DIR}/linux-${KERNELRELEASE}/arch/arm/boot/zImage ${REMOTE_ACCOUNT}:
+  COMMAND scp -p ${CMAKE_BINARY_DIR}/linux-${KERNELRELEASE}/arch/arm/boot/zImage ${REMOTE_ACCOUNT}:  
+  COMMAND cmake -E echo ssh ${REMOTE_ACCOUNT} bash -s '<' ${CMAKE_SOURCE_DIR}/remote-deploy.sh
+  COMMAND ssh ${REMOTE_ACCOUNT} bash -s < ${CMAKE_SOURCE_DIR}/remote-deploy.sh
+  VERBATIM
   )
 
 message( STATUS "--------------------------------------------" )
